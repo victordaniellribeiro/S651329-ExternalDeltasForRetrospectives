@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>S651329-ExternalDeltasForRetrospectives</title>
+
+    <script type="text/javascript" src="/apps/2.1/sdk.js"></script>
+
+    <script type="text/javascript">
+        Rally.onReady(function () {
+                Ext.define("CustomApp",{extend:"Rally.app.App",componentCls:"app",_iterationStartDate:void 0,_iterationEndDate:void 0,_iterationId:void 0,_iterationName:void 0,_notesOrTheme:void 0,_iterationsRows:void 0,items:[{xtype:"container",itemId:"header",cls:"header"},{xtype:"container",itemId:"bodyContainer",width:"100%",autoScroll:!0}],launch:function(){var t=this.getContext().getProject().ObjectID;this._projectId=t,console.log("Project:",this._projectId),this.myMask=new Ext.LoadMask({msg:"Please wait...",target:this});var e=Ext.create("Rally.ui.combobox.IterationComboBox",{fieldLabel:"Choose Iteration",width:400,itemId:"iterationComboBox",allowClear:!0,showArrows:!1,scope:this,listeners:{ready:function(t){var e=t.getRecord();this._iterationStartDate=Rally.util.DateTime.toIsoString(e.get("StartDate"),!0),this._iterationEndDate=Rally.util.DateTime.toIsoString(e.get("EndDate"),!0),this._iterationId=e.get("ObjectID"),this._iterationName=e.get("Name")},select:function(t,e,o){var a=e[0];this._iterationStartDate=Rally.util.DateTime.toIsoString(a.get("StartDate"),!0),this._iterationEndDate=Rally.util.DateTime.toIsoString(a.get("EndDate"),!0),this._iterationId=a.get("ObjectID"),this._iterationName=a.get("Name")},scope:this}}),o=Ext.create("Ext.form.field.ComboBox",{fieldLabel:"Notes or Theme",forceSelection:!0,store:["Notes","Theme"],listeners:{change:function(t){console.log("combo: ",t.getValue()),this._notesOrTheme=t.getValue()},scope:this}}),a=Ext.create("Rally.ui.Button",{text:"Search",margin:"10 10 10 100",scope:this,handler:function(){this._doSearch()}});this.down("#header").add([{xtype:"panel",autoWidth:!0,layout:"hbox",items:[{xtype:"panel",title:"Choose filter:",flex:3,bodyPadding:10,align:"stretch",autoHeight:!0,items:[e,o,a]}]}])},_doSearch:function(){this._notesOrTheme&&(this.myMask.show(),console.log("looking for iterations"),this._loadIterations().then({success:function(t){console.log("iterations:",t),this._iterations=t,this._showGrid()},scope:this}))},_loadIterations:function(){var t=[{property:"Name",operator:"=",value:this._iterationName}];return console.log("filter:",t),Ext.create("Rally.data.wsapi.Store",{context:{projectScopeUp:!1,projectScopeDown:!0,project:"/project/"+this._projectId},model:"Iteration",fetch:["Name","ObjectID","Project","StartDate","EndDate","State","Theme","Notes"],filters:t,limit:1/0}).load()},_showGrid:function(){console.log("loading iterations for grid.");var t,e=this._createStore();t="Notes"===this._notesOrTheme?Ext.create("Rally.ui.grid.Grid",{itemId:"activeStoriesGrid",viewConfig:{stripeRows:!0,enableTextSelection:!0},showRowActionsColumn:!1,showPagingToolbar:!1,enableEditing:!1,store:e,columnCfgs:[{text:"Name",dataIndex:"Name",flex:1},{text:"Project",dataIndex:"Project",flex:1},{text:"StartDate",dataIndex:"StartDate",xtype:"datecolumn",format:"m/d/Y",flex:1},{text:"EndDate",dataIndex:"EndDate",xtype:"datecolumn",format:"m/d/Y",flex:1},{text:"State",dataIndex:"State",flex:1},{text:"Notes",dataIndex:"Notes",flex:3}]}):Ext.create("Rally.ui.grid.Grid",{itemId:"activeStoriesGrid",viewConfig:{stripeRows:!0,enableTextSelection:!0},showRowActionsColumn:!1,showPagingToolbar:!1,enableEditing:!1,store:e,columnCfgs:[{text:"Name",dataIndex:"Name",flex:1},{text:"Project",dataIndex:"Project",flex:1},{text:"StartDate",dataIndex:"StartDate",xtype:"datecolumn",format:"m/d/Y",flex:1},{text:"EndDate",dataIndex:"EndDate",xtype:"datecolumn",format:"m/d/Y",flex:1},{text:"State",dataIndex:"State",flex:1},{text:"Theme",dataIndex:"Theme",flex:3}]});var o=Ext.create("Rally.ui.Button",{text:"Export",margin:"10 10 10 10",scope:this,handler:function(){var t=this._convertToCSV(this._iterationsRows);console.log("converting to csv:",t);var e=document.createElement("a"),o=new Blob(["\ufeff",t]),a=URL.createObjectURL(o);e.href=a,e.download="report.csv",document.body.appendChild(e),e.click(),document.body.removeChild(e)}}),a=Ext.create("Ext.panel.Panel",{items:o});this.down("#bodyContainer").removeAll(),this.down("#bodyContainer").add(a),this.down("#bodyContainer").add(t),this.myMask.hide()},_createStore:function(){var t=[],e=Ext.create("Ext.data.JsonStore",{fields:["Name","Project","StartDate","EndDate","State","Theme","Notes"]});return _.each(this._iterations,function(e){var o={Name:e.get("Name"),Project:e.get("Project").Name,StartDate:e.get("StartDate"),EndDate:e.get("EndDate"),State:e.get("State"),Theme:e.get("Theme"),Notes:e.get("Notes")};t.push(o)},this),e.loadData(t),this._iterationsRows=t,e},_convertToCSV:function(t){var e=Object.keys(t[0]),o=function(t,e){return null===e?"":e},a=t.map(function(t){return e.map(function(e){return JSON.stringify(t[e],o)}).join(",")});return a.unshift(e.join(",")),a.join("\r\n")}});
+
+            Rally.launchApp('CustomApp', {
+                name:"S651329-ExternalDeltasForRetrospectives",
+                parentRepos:"",
+                version:"0.1.1"
+            });
+
+        });
+    </script>
+
+
+    <style type="text/css">
+        
+    </style>
+</head>
+<body>
+</body>
+</html>

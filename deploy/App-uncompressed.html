@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>S651329-ExternalDeltasForRetrospectives</title>
+
+    <script type="text/javascript" src="/apps/2.1/sdk.js"></script>
+
+    <script type="text/javascript">
+        Rally.onReady(function () {
+                Ext.define('CustomApp', {
+    extend: 'Rally.app.App',
+    componentCls: 'app',
+
+
+    _iterationStartDate : undefined,
+    _iterationEndDate : undefined,
+    _iterationId : undefined,
+    _iterationName: undefined,
+    _notesOrTheme: undefined,
+    _iterationsRows: undefined,
+
+
+
+    items:[
+        {
+            xtype:'container',
+            itemId:'header',
+            cls:'header'
+        },
+        {
+            xtype:'container',
+            itemId:'bodyContainer',
+			width:'100%',
+			autoScroll:true
+        }
+    ],
+
+
+
+
+    launch: function() {
+        //Write app code here
+
+        //API Docs: https://help.rallydev.com/apps/2.1/doc/
+
+
+        var context =  this.getContext();
+        var project = context.getProject()['ObjectID'];
+        this._projectId = project;
+
+        console.log('Project:', this._projectId);
+
+
+        this.myMask = new Ext.LoadMask({
+            msg: 'Please wait...',
+            target: this
+        });
+
+
+        var iterationComboBox = Ext.create('Rally.ui.combobox.IterationComboBox', {
+			fieldLabel: 'Choose Iteration',
+			width: 400,
+            itemId: 'iterationComboBox',
+            allowClear: true,
+            showArrows: false,
+            scope: this,
+            listeners: {
+                ready: function(combobox) {
+                	var iteration = combobox.getRecord();
+
+                    this._iterationStartDate = Rally.util.DateTime.toIsoString(iteration.get('StartDate'),true);
+                    this._iterationEndDate = Rally.util.DateTime.toIsoString(iteration.get('EndDate'),true);
+                	this._iterationId = iteration.get('ObjectID');
+                	this._iterationName = iteration.get('Name');
+
+                },
+                select: function(combobox, records, opts) {
+                    var iteration = records[0];
+
+                    this._iterationStartDate = Rally.util.DateTime.toIsoString(iteration.get('StartDate'),true);
+                    this._iterationEndDate = Rally.util.DateTime.toIsoString(iteration.get('EndDate'),true);
+                	this._iterationId = iteration.get('ObjectID');
+                	this._iterationName = iteration.get('Name');
+                },
+                scope: this
+            }
+
+        });
+
+
+        var notesOrThemeCombo = Ext.create('Ext.form.field.ComboBox', {
+        	fieldLabel: 'Notes or Theme',
+        	forceSelection: true, 
+        	store: ['Notes', 'Theme'],
+        	listeners: {
+	        	change: function(combo) {
+					console.log('combo: ', combo.getValue());
+					//console.log('store', this._milestoneComboStore);
+
+					this._notesOrTheme = combo.getValue();
+				},
+				scope: this
+	        }
+
+        });
+
+
+        var searchButton = Ext.create('Rally.ui.Button', {
+        	text: 'Search',
+        	margin: '10 10 10 100',
+        	scope: this,
+        	handler: function() {
+        		//handles search
+        		//console.log(initDate, endDate);
+        		this._doSearch();
+        	}
+        });
+
+
+
+        this.down('#header').add([
+			{
+				xtype: 'panel',
+				autoWidth: true,
+				//height: 120,
+				layout: 'hbox',
+
+				items: [{
+					xtype: 'panel',
+					title: 'Choose filter:',
+					flex: 3,
+					bodyPadding: 10,
+					align: 'stretch',
+					autoHeight: true,
+					items: [iterationComboBox,
+							notesOrThemeCombo,
+						    searchButton
+					]}
+				]
+			}
+		]);
+
+
+
+    },
+
+
+    _doSearch: function() {
+
+    	if (! this._notesOrTheme) {
+    		return;
+    	}
+
+
+
+    	this.myMask.show();
+
+    	console.log('looking for iterations');
+    	this._loadIterations().then({
+    		success: function(iterations) {
+				console.log('iterations:', iterations);
+				this._iterations = iterations;
+				
+				this._showGrid();
+			},
+			scope: this
+
+		});
+
+    },
+
+
+    _loadIterations: function() {
+    	var filter = [
+        		{
+                    property: 'Name',
+                    operator: '=',
+                    value: this._iterationName
+                }
+			];// = this._getFilters();
+    	console.log('filter:', filter);
+
+    	var iterationStore = Ext.create('Rally.data.wsapi.Store', {
+			context: {
+		        projectScopeUp: false,
+		        projectScopeDown: true,
+		        project: '/project/'+ this._projectId //null to search all workspace
+		    },
+			model: 'Iteration',
+			fetch: ['Name', 'ObjectID', 'Project', 'StartDate', 'EndDate', 'State', 'Theme', 'Notes'],
+			filters: filter,
+			limit: Infinity
+		});
+
+		return iterationStore.load();
+    },
+
+
+    _showGrid: function() {
+    	console.log('loading iterations for grid.');
+    	var store = this._createStore();
+
+    	var grid;
+
+
+    	if ('Notes' === this._notesOrTheme) {
+			grid = Ext.create('Rally.ui.grid.Grid', {
+	    		//width: 1600,
+	    		itemId: 'activeStoriesGrid',
+				viewConfig: {
+					stripeRows: true,
+					enableTextSelection: true
+				},
+				showRowActionsColumn: false,
+				showPagingToolbar: false,
+				enableEditing: false,
+	    		store: store,
+
+	    		columnCfgs: [
+	                {
+	                    text: 'Name',
+	                    dataIndex: 'Name',
+	                    flex: 1
+	                },
+	                {
+	                    text: 'Project',
+	                    dataIndex: 'Project',
+	                    flex: 1
+	                },
+	                {
+	                	text: 'StartDate',
+	                    dataIndex: 'StartDate',
+	                    xtype: 'datecolumn',
+                    	format   : 'm/d/Y',
+	                    flex: 1
+	                },
+	                {
+	                	text: 'EndDate',
+	                    dataIndex: 'EndDate',
+	                    xtype: 'datecolumn',
+                    	format   : 'm/d/Y',
+	                    flex: 1
+	                },
+	                {
+	                	text: 'State',
+	                    dataIndex: 'State',
+	                    flex: 1	
+	                },
+	                {
+	                	text: 'Notes',
+	                    dataIndex: 'Notes',
+	                    flex: 3
+	                }
+	            ]
+        	});
+    	} else {
+			grid = Ext.create('Rally.ui.grid.Grid', {
+	    		//width: 1600,
+	    		itemId: 'activeStoriesGrid',
+				viewConfig: {
+					stripeRows: true,
+					enableTextSelection: true
+				},
+				showRowActionsColumn: false,
+				showPagingToolbar: false,
+				enableEditing: false,
+	    		store: store,
+
+	    		columnCfgs: [
+	                {
+	                    text: 'Name',
+	                    dataIndex: 'Name',
+	                    flex: 1
+	                },
+	                {
+	                    text: 'Project',
+	                    dataIndex: 'Project',
+	                    flex: 1
+	                },
+	                {
+	                	text: 'StartDate',
+	                    dataIndex: 'StartDate',
+	                    xtype: 'datecolumn',
+                    	format   : 'm/d/Y',
+	                    flex: 1	
+	                },
+	                {
+	                	text: 'EndDate',
+	                    dataIndex: 'EndDate',
+	                    xtype: 'datecolumn',
+                    	format   : 'm/d/Y',
+	                    flex: 1	
+	                },
+	                {
+	                	text: 'State',
+	                    dataIndex: 'State',
+	                    flex: 1	
+	                },
+	                {
+	                	text: 'Theme',
+	                    dataIndex: 'Theme',
+	                    flex: 3	
+	                }
+	            ]
+        	});
+    	}
+
+    	var exportButton = Ext.create('Rally.ui.Button', {
+        	text: 'Export',
+        	margin: '10 10 10 10',
+        	scope: this,
+        	handler: function() {
+        		var csv = this._convertToCSV(this._iterationsRows);
+        		console.log('converting to csv:', csv);
+
+
+        		//Download the file as CSV
+		        var downloadLink = document.createElement("a");
+		        var blob = new Blob(["\ufeff", csv]);
+		        var url = URL.createObjectURL(blob);
+		        downloadLink.href = url;
+		        downloadLink.download = "report.csv";  //Name the file here
+		        document.body.appendChild(downloadLink);
+		        downloadLink.click();
+		        document.body.removeChild(downloadLink);
+        	}
+        });
+
+        var exportPanel = Ext.create('Ext.panel.Panel',{
+        	items: exportButton
+        });
+
+    	this.down('#bodyContainer').removeAll();
+    	this.down('#bodyContainer').add(exportPanel);
+        this.down('#bodyContainer').add(grid);
+
+
+    	this.myMask.hide();
+
+    },
+
+    _createStore: function() {
+    	var rows = [];
+
+    	var store = Ext.create('Ext.data.JsonStore', {
+			fields: ['Name', 
+                    'Project',
+                    'StartDate',
+                    'EndDate',
+                    'State',
+                    'Theme',
+                    'Notes']
+        });
+
+
+        _.each(this._iterations, function(iteration) {
+				var rowIteration = {
+					Name: iteration.get('Name'),
+					Project: iteration.get('Project').Name,
+					StartDate: iteration.get('StartDate'),
+					EndDate: iteration.get('EndDate'),
+					State: iteration.get('State'),
+					Theme: iteration.get('Theme'),
+					Notes: iteration.get('Notes')
+				};
+
+				rows.push(rowIteration);
+
+			}, this);
+
+        store.loadData(rows);
+
+        this._iterationsRows = rows;
+
+		return store;
+    },
+
+
+     _convertToCSV: function(objArray) {
+		var fields = Object.keys(objArray[0]);
+
+		var replacer = function(key, value) { return value === null ? '' : value; };
+		var csv = objArray.map(function(row){
+		  return fields.map(function(fieldName) {
+		    return JSON.stringify(row[fieldName], replacer);
+		  }).join(',');
+		});
+
+		csv.unshift(fields.join(',')); // add header column
+
+		//console.log(csv.join('\r\n'));
+
+		return csv.join('\r\n');
+    }
+});
+
+
+            Rally.launchApp('CustomApp', {
+                name:"S651329-ExternalDeltasForRetrospectives",
+                parentRepos:"",
+                version:"0.1.1"
+            });
+
+        });
+    </script>
+
+
+
+    <style type="text/css">
+        .app {
+  /* Add app styles here */
+}
+
+    </style>
+</head>
+<body>
+</body>
+</html>
